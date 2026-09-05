@@ -340,6 +340,15 @@ class GC9A01:
         GPIO.output(CS, GPIO.HIGH)
 
 
+    def show_buffer(self, buffer):
+
+        self.set_window(0, 0, 239, 239)
+
+        for i in range(0, len(buffer), 4096):
+            self.spi.xfer2(buffer[i:i + 4096])
+
+        GPIO.output(CS, GPIO.HIGH)
+
     def close(self):
 
         self.spi.close()
