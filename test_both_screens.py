@@ -1,11 +1,21 @@
 import time
 import math
+import RPi.GPIO as GPIO
 
 from gc9a01 import GC9A01
 
 
 WIDTH = 240
 HEIGHT = 240
+
+# ---------------------------------------------------------
+# GPIO
+# ---------------------------------------------------------
+
+BUTTON = 23
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 # ---------------------------------------------------------
@@ -18,11 +28,76 @@ GREEN = 0x07E0
 YELLOW = 0xFFE0
 CYAN = 0x07FF
 GREY = 0x8410
-RED = 0xF800
 
 
 # ---------------------------------------------------------
-# Basic drawing functions
+# Aircraft
+# ---------------------------------------------------------
+
+planes = [
+    {
+        "callsign": "BA142",
+        "airline": "BRITISH",
+        "altitude": 12500,
+        "speed": 420,
+        "heading": 275,
+        "origin": "LHR",
+        "destination": "BFS",
+        "origin_name": "LONDON",
+        "destination_name": "BELFAST",
+        "angle": 25,
+        "distance": 55,
+    },
+
+    {
+        "callsign": "EZY21",
+        "airline": "EASYJET",
+        "altitude": 18500,
+        "speed": 465,
+        "heading": 320,
+        "origin": "MAN",
+        "destination": "BFS",
+        "origin_name": "MANCHESTER",
+        "destination_name": "BELFAST",
+        "angle": 115,
+        "distance": 82,
+    },
+
+    {
+        "callsign": "RYR67",
+        "airline": "RYANAIR",
+        "altitude": 9500,
+        "speed": 390,
+        "heading": 180,
+        "origin": "DUB",
+        "destination": "LPL",
+        "origin_name": "DUBLIN",
+        "destination_name": "LIVERPOOL",
+        "angle": 205,
+        "distance": 43,
+    },
+
+    {
+        "callsign": "KLM31",
+        "airline": "KLM",
+        "altitude": 22000,
+        "speed": 510,
+        "heading": 70,
+        "origin": "AMS",
+        "destination": "BHD",
+        "origin_name": "AMSTERDAM",
+        "destination_name": "BELFAST",
+        "angle": 310,
+        "distance": 98,
+    }
+]
+
+
+selected_plane = 0
+
+
+# ---------------------------------------------------------
+# Drawing
 # ---------------------------------------------------------
 
 def pixel(buffer, x, y, colour):
@@ -89,13 +164,14 @@ def draw_circle(buffer, cx, cy, radius, colour):
 
         if decision <= 0:
             decision += 2 * y + 1
+
         else:
             x -= 1
             decision += 2 * (y - x) + 1
 
 
 # ---------------------------------------------------------
-# Tiny font
+# Font
 # ---------------------------------------------------------
 
 FONT = {
@@ -206,41 +282,6 @@ def centred_text(buffer, text, y, scale, colour):
 # Radar
 # ---------------------------------------------------------
 
-planes = [
-    {
-        "angle": 25,
-        "distance": 55,
-        "speed": 0.20,
-        "callsign": "BA142",
-        "selected": True
-    },
-
-    {
-        "angle": 115,
-        "distance": 82,
-        "speed": -0.12,
-        "callsign": "EZY21",
-        "selected": False
-    },
-
-    {
-        "angle": 205,
-        "distance": 43,
-        "speed": 0.08,
-        "callsign": "RYR67",
-        "selected": False
-    },
-
-    {
-        "angle": 310,
-        "distance": 98,
-        "speed": -0.16,
-        "callsign": "KLM31",
-        "selected": False
-    }
-]
-
-
 def create_radar(angle):
 
     buffer = bytearray(WIDTH * HEIGHT * 2)
@@ -253,7 +294,7 @@ def create_radar(angle):
     cx = 120
     cy = 120
 
-    # Radar circles
+    # Radar rings
     draw_circle(buffer, cx, cy, 30, GREEN)
     draw_circle(buffer, cx, cy, 60, GREEN)
     draw_circle(buffer, cx, cy, 90, GREEN)
@@ -263,7 +304,7 @@ def create_radar(angle):
     draw_line(buffer, 5, cy, 235, cy, GREEN)
     draw_line(buffer, cx, 5, cx, 235, GREEN)
 
-    # Diagonal guides
+    # Diagonal lines
     draw_line(buffer, 38, 38, 202, 202, GREY)
     draw_line(buffer, 202, 38, 38, 202, GREY)
 
@@ -288,7 +329,7 @@ def create_radar(angle):
     )
 
     # Aircraft
-    for plane in planes:
+    for index, plane in enumerate(planes):
 
         a = math.radians(plane["angle"])
 
@@ -304,28 +345,40 @@ def create_radar(angle):
             math.cos(a)
         )
 
-        colour = YELLOW if plane["selected"] else CYAN
+        if index == selected_plane:
+            colour = YELLOW
 
-        # Target
-        draw_circle(
-            buffer,
-            x,
-            y,
-            4,
-            colour
-        )
+            # Larger selected target
+            draw_circle(
+                buffer,
+                x,
+                y,
+                7,
+                YELLOW
+            )
 
-        # Aircraft heading line
+        else:
+            colour = CYAN
+
+            draw_circle(
+                buffer,
+                x,
+                y,
+                4,
+                CYAN
+            )
+
+        # Heading line
         heading_rad = math.radians(
-            plane["angle"] + 90
+            plane["heading"]
         )
 
         hx = int(
-            x + 9 * math.cos(heading_rad)
+            x + 10 * math.sin(heading_rad)
         )
 
         hy = int(
-            y + 9 * math.sin(heading_rad)
+            y - 10 * math.cos(heading_rad)
         )
 
         draw_line(
@@ -350,21 +403,10 @@ def create_radar(angle):
 
 
 # ---------------------------------------------------------
-# Flight information
+# Information screen
 # ---------------------------------------------------------
 
-flight = {
-    "callsign": "BA142",
-    "airline": "BRITISH",
-    "altitude": 12500,
-    "speed": 420,
-    "heading": 275,
-    "origin": "LHR",
-    "destination": "BFS"
-}
-
-
-def create_info_screen():
+def create_info_screen(plane):
 
     buffer = bytearray(WIDTH * HEIGHT * 2)
 
@@ -382,7 +424,7 @@ def create_info_screen():
     # Callsign
     centred_text(
         buffer,
-        flight["callsign"],
+        plane["callsign"],
         18,
         3,
         YELLOW
@@ -391,13 +433,12 @@ def create_info_screen():
     # Airline
     centred_text(
         buffer,
-        flight["airline"],
+        plane["airline"],
         45,
         2,
         CYAN
     )
 
-    # Separator
     draw_line(
         buffer,
         25,
@@ -418,7 +459,7 @@ def create_info_screen():
 
     centred_text(
         buffer,
-        str(flight["altitude"]) + " FT",
+        str(plane["altitude"]) + " FT",
         100,
         3,
         GREEN
@@ -435,7 +476,7 @@ def create_info_screen():
 
     centred_text(
         buffer,
-        str(flight["speed"]) + " KMH",
+        str(plane["speed"]) + " KMH",
         153,
         2,
         GREEN
@@ -452,7 +493,7 @@ def create_info_screen():
 
     centred_text(
         buffer,
-        str(flight["heading"]) + " DEG",
+        str(plane["heading"]) + " DEG",
         201,
         2,
         GREEN
@@ -462,38 +503,96 @@ def create_info_screen():
 
 
 # ---------------------------------------------------------
-# Main
+# Displays
 # ---------------------------------------------------------
 
 print("Starting displays...")
 
-# Display 1 = radar
-radar_display = GC9A01(cs=8, reset_display=True)
+radar_display = GC9A01(
+    cs=8,
+    reset_display=True
+)
 
-# Display 2 = information
-info_display = GC9A01(cs=7, reset_display=False)
+info_display = GC9A01(
+    cs=7,
+    reset_display=False
+)
 
 print("Both displays initialised.")
 
 
+# ---------------------------------------------------------
+# Initial information screen
+# ---------------------------------------------------------
+
+info_buffer = create_info_screen(
+    planes[selected_plane]
+)
+
+info_display.show_buffer(info_buffer)
+
+
+# ---------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------
+
+angle = 0
+
+last_button = GPIO.input(BUTTON)
+
+
 try:
-
-    # Draw initial information screen
-    info_buffer = create_info_screen()
-    info_display.show_buffer(info_buffer)
-
-    angle = 0
 
     while True:
 
+        # ---------------------------------------------
+        # Check button
+        # ---------------------------------------------
+
+        button = GPIO.input(BUTTON)
+
+        # Button pressed = LOW
+        if last_button == GPIO.HIGH and button == GPIO.LOW:
+
+            selected_plane += 1
+
+            if selected_plane >= len(planes):
+                selected_plane = 0
+
+            plane = planes[selected_plane]
+
+            print(
+                "Selected:",
+                plane["callsign"],
+                plane["origin"],
+                "->",
+                plane["destination"]
+            )
+
+            # Update information screen
+            info_buffer = create_info_screen(
+                plane
+            )
+
+            info_display.show_buffer(
+                info_buffer
+            )
+
+            # Small debounce
+            time.sleep(0.25)
+
+        last_button = button
+
+        # ---------------------------------------------
         # Update radar
+        # ---------------------------------------------
+
         radar_buffer = create_radar(angle)
 
         radar_display.show_buffer(
             radar_buffer
         )
 
-        # Move sweep
         angle += 5
 
         if angle >= 360:
@@ -511,5 +610,7 @@ finally:
 
     radar_display.close()
     info_display.close()
+
+    GPIO.cleanup()
 
     print("Displays closed.")
