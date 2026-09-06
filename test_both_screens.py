@@ -12,7 +12,7 @@ HEIGHT = 240
 # GPIO
 # ---------------------------------------------------------
 
-BUTTON = 23
+BUTTON =23
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)

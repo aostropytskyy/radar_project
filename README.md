@@ -27,6 +27,9 @@ jumper cables
 #### RST	GPIO24 pin 18
 #### BLK	3.3V pin 17
 
+### button
+#### gpio 4/pin 16 
+
 ## libraries installed
 ### pip install pyopensky
 
