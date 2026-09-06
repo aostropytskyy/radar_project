@@ -12,7 +12,7 @@ class GC9A01:
     DC = 25
     RST = 24
 
-    def __init__(self, cs=8):
+    def __init__(self, cs=8, reset_display=True):
 
         # Allow each display to have its own CS pin
         self.cs = cs
@@ -39,8 +39,11 @@ class GC9A01:
         self.spi.lsbfirst = False
         self.spi.bits_per_word = 8
 
-        self.reset()
+        if reset_display:
+            self.reset()
+
         self.init_display()
+
 
     # ---------------------------------------------------------
     # Reset
