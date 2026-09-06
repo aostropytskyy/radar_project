@@ -27,5 +27,8 @@ jumper cables
 #### RST	GPIO24 pin 18
 #### BLK	3.3V pin 17
 
+## libraries installed
+### pip install pyopensky
+
 ## Declaration
 ### Chat gpt was used to help solve graphical problems
